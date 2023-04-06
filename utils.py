@@ -75,21 +75,12 @@ class SeamImage:
         Guidelines & hints:
             In order to calculate a gradient of a pixel, only its neighborhood is required.
         """
-        # gaussian_filtering = np.array([np.array([1,2,1]),np.array([2,4,2]),np.array([1,2,1])])/16
-        # Compute gradient in the x and y directions
+
         padded_img = np.pad(self.gs, 1, mode='constant')
         grad_x = np.gradient(padded_img)[0][1:-1, 1:-1]
         grad_y = np.gradient(padded_img)[1][1:-1, 1:-1]
 
-        # grad_x = np.sqrt(np.sum(np.square(np.diff(self.gs, axis=1)), axis=2))
-        # grad_y = np.sqrt(np.sum(np.square(np.diff(self.gs, axis=0)), axis=2).T)     
-        # # Compute gradient magnitude
         return np.sqrt(grad_x**2 + grad_y**2)[1:-1, 1:-1, 1:-1]
-        
-
-    # def gradient_def(self, x, y):
-    #     img = []        
-    #     return ((img[x+1,y]-img[x,y])**2+(img[x,y+1]-img[x,y])**2)** 0.5
         
     def calc_M(self):
         pass
@@ -154,21 +145,11 @@ class ColumnSeamImage(SeamImage):
             The formula of calculation M is as taught, but with certain terms omitted.
             You might find the function 'np.roll' useful.
         """
-        # grad_mag_padded = self.E.copy()
-        # for c in range(1, len(grad_mag_padded)):
-        #     for r in range(1, len(grad_mag_padded[c])):
-        #         grad_mag_padded[c][r] += min(grad_mag_padded[c-1][r-1][1],grad_mag_padded[c-1][r][1], grad_mag_padded[c-1][r+1][1])
-        # return grad_mag_padded
-    
+
         padded_img = self.E.copy()
         for i in range(1, len(padded_img)):
             for j in range(1, len(padded_img[i])):
-                if j == 0:
-                    padded_img[i, j] += min(padded_img[i-1, j], padded_img[i-1, j+1])
-                elif j == len(padded_img[i])-1:
-                    padded_img[i, j] += min(padded_img[i-1, j-1], padded_img[i-1, j])
-                else:
-                    padded_img[i, j] += min(padded_img[i-1, j-1], padded_img[i-1, j], padded_img[i-1, j+1])
+                padded_img[i, j] += padded_img[i-1, j]
         return padded_img
 
     def seams_removal(self, num_remove: int):
@@ -197,10 +178,10 @@ class ColumnSeamImage(SeamImage):
         
 
     def update_E(self, seam_idx):
-        raise NotImplementedError("TODO: Implement SeamImage.update_E")
+        self.E = np.delete(self.E, seam_idx, axis=1)
 
     def update_M(self, seam_idx):
-        raise NotImplementedError("TODO: Implement SeamImage.update_E")
+        self.M = np.delete(self.M, seam_idx, axis=1)
 
     def seams_removal_horizontal(self, num_remove):
         """ Removes num_remove horizontal seams
@@ -210,9 +191,11 @@ class ColumnSeamImage(SeamImage):
 
         Guidelines & hints:
             You may find np.rot90 function useful
-
         """
-        raise NotImplementedError("TODO: Implement SeamImage.seams_removal_horizontal")
+        self.E = np.rot90(self.E)
+        self.M = self.calc_M()
+        self.seams_removal_vertical(num_remove)
+        self.E = np.rot90(self.E, k=-1)
 
     def seams_removal_vertical(self, num_remove):
         """ A wrapper for removing num_remove horizontal seams (just a recommendation)
@@ -220,7 +203,11 @@ class ColumnSeamImage(SeamImage):
         Parameters:
             num_remove (int): number of vertical seam to be removed
         """
-        raise NotImplementedError("TODO: Implement SeamImage.seams_removal_vertical")
+        seam_idx = list(map(lambda x: x[0], sorted(enumerate(self.M.T[0][-1]), key=lambda val:val[1])[:num_remove]))
+        self.update_E(seam_idx)
+        self.update_M(seam_idx)
+        for _ in range(num_remove):
+            self.remove_seam()
 
     def backtrack_seam(self):
         """ Backtracks a seam for Column Seam Carving method
@@ -233,7 +220,7 @@ class ColumnSeamImage(SeamImage):
         Guidelines & hints:
         In order to apply the removal, you might want to extend the seam mask to support 3 channels (rgb) using: 3d_mak = np.stack([1d_mask] * 3, axis=2), and then use it to create a resized version.
         """
-        raise NotImplementedError("TODO: Implement SeamImage.remove_seam")
+        self.rgb = np.delete(self.rgb, 2, axis=1)
 
 
 class VerticalSeamImage(SeamImage):
